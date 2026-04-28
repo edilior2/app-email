@@ -295,82 +295,107 @@ app.post('/api/send', async (req, res) => {
         return res.status(400).json({ error: 'Faltan campos (to, subject, htmlBody)' });
     }
 
-    // Check if user is unsubscribed
-    try {
-        const unsubsResult = await db.execute({
-            sql: 'SELECT 1 FROM unsubscribed WHERE email = ?',
-            args: [to]
-        });
-        if (unsubsResult.rows.length > 0) {
-            return res.status(403).json({ error: 'Este e-mail cancelou a inscrição e não pode receber mais mensagens' });
-        }
-    } catch (e) {
-        console.error("Error checking unsubscribe status:", e);
-    }
-
-    // Append unsubscribe link automatically if missing
-    if (!htmlBody.includes('/api/unsubscribe')) {
-        const baseUrl = `${req.protocol}://${req.get('host')}`;
-        const unsubsLink = `${baseUrl}/api/unsubscribe?email=${encodeURIComponent(to)}`;
-        const unsubscribeHtml = `
-            <br><br>
-            <table width="100%" border="0" cellspacing="0" cellpadding="0" style="margin-top: 30px;">
-                <tr>
-                    <td align="center" style="border-top: 1px solid #eaeaea; padding-top: 20px;">
-                        <p style="font-family: sans-serif; font-size: 11px; color: #888; margin: 0;">
-                            Se você não deseja mais receber nossos e-mails, 
-                            <a href="${unsubsLink}" style="color: #666; text-decoration: underline;">clique aqui para cancelar sua inscrição</a>.
-                        </p>
-                    </td>
-                </tr>
-            </table>
-        `;
-        htmlBody += unsubscribeHtml;
+    // Split emails separated by comma
+    const emailsList = to.split(',').map(e => e.trim()).filter(e => e);
+    if (emailsList.length === 0) {
+        return res.status(400).json({ error: 'Correos no válidos' });
     }
 
     // Hardcoded API Key as requested by the user
     const resendApiKey = 're_iuoMZFZ2_LMAWT4CDcwQsyDemieep6L8b';
 
     let emailVinculado = 'contato@digitallicencas.com.br';
+    let publicUrl = '';
     try {
         const emailVinculadoRow = await db.execute("SELECT value FROM settings WHERE key = 'EMAIL_VINCULADO'");
         if (emailVinculadoRow.rows.length > 0) {
             emailVinculado = emailVinculadoRow.rows[0].value;
         }
+        const publicUrlRow = await db.execute("SELECT value FROM settings WHERE key = 'PUBLIC_URL'");
+        if (publicUrlRow.rows.length > 0) {
+            publicUrl = publicUrlRow.rows[0].value;
+        }
     } catch (e) {
-        console.error("Error reading setting:", e);
+        console.error("Error reading settings:", e);
     }
 
     const resend = new Resend(resendApiKey);
 
-    try {
-        const { data, error } = await resend.emails.send({
-            from: `Digital Licenças <${emailVinculado}>`,
-            to: to,
-            subject: subject,
-            html: htmlBody,
-        });
+    let sentCount = 0;
+    let errors = [];
 
-        if (error) {
-            console.error("Error al enviar con Resend:", error);
-            return res.status(500).json({ error: error.message });
-        }
-
-        // Guardar en la base de datos
+    for (const email of emailsList) {
         try {
-            await db.execute({
-                sql: "INSERT INTO emails_sent (resend_id, to_email, subject, template_name) VALUES (?, ?, ?, ?)",
-                args: [data.id, to, subject, templateName || null]
+            // Check if user is unsubscribed
+            const unsubsResult = await db.execute({
+                sql: 'SELECT 1 FROM unsubscribed WHERE email = ?',
+                args: [email]
             });
-        } catch (e) {
-            console.error("Error saving sent email to DB:", e);
-        }
+            if (unsubsResult.rows.length > 0) {
+                errors.push(`Email ${email} canceló la inscripción.`);
+                continue;
+            }
 
-        res.json({ success: true, id: data.id });
-    } catch (e) {
-        console.error("Error inesperado en servidor:", e);
-        return res.status(500).json({ error: e.message });
+            // Append unsubscribe link automatically if missing
+            let currentHtmlBody = htmlBody;
+            if (!currentHtmlBody.includes('/api/unsubscribe')) {
+                let baseUrl = publicUrl;
+                if (!baseUrl) {
+                    baseUrl = `${req.protocol}://${req.get('host')}`;
+                }
+                baseUrl = baseUrl.replace(/\/$/, ''); // Remove trailing slash if present
+                
+                const unsubsLink = `${baseUrl}/api/unsubscribe?email=${encodeURIComponent(email)}`;
+                const unsubscribeHtml = `
+                    <br><br>
+                    <table width="100%" border="0" cellspacing="0" cellpadding="0" style="margin-top: 30px;">
+                        <tr>
+                            <td align="center" style="border-top: 1px solid #eaeaea; padding-top: 20px;">
+                                <p style="font-family: sans-serif; font-size: 11px; color: #888; margin: 0;">
+                                    Se você não deseja mais receber nossos e-mails, 
+                                    <a href="${unsubsLink}" style="color: #666; text-decoration: underline;">clique aqui para cancelar sua inscrição</a>.
+                                </p>
+                            </td>
+                        </tr>
+                    </table>
+                `;
+                currentHtmlBody += unsubscribeHtml;
+            }
+
+            const { data, error } = await resend.emails.send({
+                from: `Digital Licenças <${emailVinculado}>`,
+                to: email,
+                subject: subject,
+                html: currentHtmlBody,
+            });
+
+            if (error) {
+                console.error(`Error al enviar a ${email} con Resend:`, error);
+                errors.push(`Error para ${email}: ${error.message}`);
+                continue;
+            }
+
+            // Guardar en la base de datos
+            try {
+                await db.execute({
+                    sql: "INSERT INTO emails_sent (resend_id, to_email, subject, template_name) VALUES (?, ?, ?, ?)",
+                    args: [data.id, email, subject, templateName || null]
+                });
+            } catch (e) {
+                console.error("Error saving sent email to DB:", e);
+            }
+            sentCount++;
+        } catch (e) {
+            console.error(`Error inesperado procesando ${email}:`, e);
+            errors.push(`Error inesperado para ${email}: ${e.message}`);
+        }
     }
+
+    if (sentCount === 0 && errors.length > 0) {
+        return res.status(500).json({ error: errors.join(', ') });
+    }
+
+    res.json({ success: true, message: `Enviado a ${sentCount} correos`, errors: errors.length > 0 ? errors : undefined });
 });
 
 const PORT = process.env.PORT || 3001;

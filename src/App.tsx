@@ -26,6 +26,7 @@ import { apiFetch } from './lib/api';
 
 export default function App() {
   const [currentScreen, setCurrentScreen] = React.useState<Screen>('home');
+  const [previousScreen, setPreviousScreen] = React.useState<Screen | null>(null);
   const [selectedTemplate, setSelectedTemplate] = React.useState<EmailTemplate | null>(null);
   const [templates, setTemplates] = React.useState<EmailTemplate[]>([]);
 
@@ -62,16 +63,24 @@ export default function App() {
 
   const handleCreateNew = () => {
     setSelectedTemplate(null);
+    setPreviousScreen(currentScreen);
     setCurrentScreen('editor');
   };
 
   const handleEditTemplate = (template: EmailTemplate) => {
     setSelectedTemplate(template);
+    setPreviousScreen(currentScreen);
     setCurrentScreen('editor');
   };
 
   const handleBack = () => {
-    setCurrentScreen('home');
+    if (currentScreen === 'editor' && previousScreen) {
+      setCurrentScreen(previousScreen);
+      setPreviousScreen(null);
+    } else {
+      setCurrentScreen('home');
+      setPreviousScreen(null);
+    }
   };
 
   const handleSaveTemplate = (template: EmailTemplate, redirectHome: boolean = true) => {
@@ -88,14 +97,26 @@ export default function App() {
       }
       return [template, ...prev];
     });
-    if (redirectHome) setCurrentScreen('home');
+    if (redirectHome) {
+      if (previousScreen) {
+        setCurrentScreen(previousScreen);
+        setPreviousScreen(null);
+      } else {
+        setCurrentScreen('home');
+      }
+    }
   };
 
   const handleDeleteTemplate = (id: string, redirectHome: boolean = false) => {
     apiFetch(`/api/templates/${id}`, { method: 'DELETE' }).catch(e => console.error("Error deleting template", e));
     setTemplates(prev => prev.filter(t => t.id !== id));
     if (redirectHome) {
-      setCurrentScreen('home');
+      if (previousScreen) {
+        setCurrentScreen(previousScreen);
+        setPreviousScreen(null);
+      } else {
+        setCurrentScreen('home');
+      }
     }
   };
 

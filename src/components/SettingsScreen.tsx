@@ -11,6 +11,7 @@ interface SettingsScreenProps {
 export const SettingsScreen: React.FC<SettingsScreenProps> = ({ onBack }) => {
     const [apiKey, setApiKey] = useState('');
     const [email, setEmail] = useState('');
+    const [publicUrl, setPublicUrl] = useState('');
     const [themeMode, setThemeMode] = useState('dark');
     const [isSaving, setIsSaving] = useState(false);
     const [saveSuccess, setSaveSuccess] = useState(false);
@@ -21,6 +22,7 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({ onBack }) => {
             .then(data => {
                 if (data.RESEND_API_KEY) setApiKey(data.RESEND_API_KEY);
                 if (data.EMAIL_VINCULADO) setEmail(data.EMAIL_VINCULADO);
+                if (data.PUBLIC_URL) setPublicUrl(data.PUBLIC_URL);
                 if (data.THEME_MODE) setThemeMode(data.THEME_MODE);
             })
             .catch(err => console.error("Error loading settings:", err));
@@ -35,6 +37,7 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({ onBack }) => {
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
                     EMAIL_VINCULADO: email,
+                    PUBLIC_URL: publicUrl,
                     THEME_MODE: themeMode
                 })
             });
@@ -109,6 +112,28 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({ onBack }) => {
                             value={email}
                             onChange={(e) => setEmail(e.target.value)}
                             placeholder="contato@digitallicencas.com.br"
+                            className="w-full h-12 px-4 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 focus:ring-2 focus:ring-primary/40 focus:border-primary transition-all outline-none"
+                        />
+                    </div>
+                </section>
+
+                <section className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl p-6 space-y-6 shadow-sm">
+                    <div className="flex items-center gap-3 border-b border-slate-100 dark:border-slate-800 pb-4">
+                        <div className="p-2 bg-blue-500/10 text-blue-500 rounded-lg">
+                            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1" /></svg>
+                        </div>
+                        <div>
+                            <h3 className="text-lg font-bold">Enlace Público de la App</h3>
+                            <p className="text-sm text-slate-500">URL pública donde alojas esta app (usado para desuscripciones).</p>
+                        </div>
+                    </div>
+                    <div className="space-y-2">
+                        <label className="text-sm font-semibold text-slate-700 dark:text-slate-300 ml-1">URL Pública (Opcional)</label>
+                        <input
+                            type="url"
+                            value={publicUrl}
+                            onChange={(e) => setPublicUrl(e.target.value)}
+                            placeholder="https://mi-app-email.up.railway.app"
                             className="w-full h-12 px-4 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 focus:ring-2 focus:ring-primary/40 focus:border-primary transition-all outline-none"
                         />
                     </div>

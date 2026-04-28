@@ -212,6 +212,7 @@ export const TemplatesScreen: React.FC<TemplatesScreenProps> = ({ templates, onB
                 .filter(t => t.title.toLowerCase().includes(searchQuery.toLowerCase()))
                 .filter(t => {
                   if (activeTab === 'Borradores') return t.status === 'draft';
+                  if (activeTab === 'Todas') return t.status !== 'draft';
                   return true;
                 })
                 .map((template) => {

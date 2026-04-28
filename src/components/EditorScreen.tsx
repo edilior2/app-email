@@ -57,10 +57,10 @@ export const EditorScreen: React.FC<EditorScreenProps> = ({ template, onSave, on
 
     onSave({
       id: currentId,
-      title: designName.trim() || 'Borrador Enviado',
+      title: designName.trim() || (template ? template.title : 'Borrador Enviado'),
       lastEdited: 'justo ahora',
-      category: category.trim() || 'Borradores',
-      status: 'draft',
+      category: category.trim() || (template ? template.category : 'Borradores'),
+      status: template?.status || 'draft',
       icon: 'Mail',
       htmlBody,
       to,
@@ -108,11 +108,11 @@ export const EditorScreen: React.FC<EditorScreenProps> = ({ template, onSave, on
   const handleBackWrapper = () => {
     if (!template && !draftId && (designName.trim() || htmlBody !== "<div style='color: blue;'>Hello World!</div>")) {
       onSave({
-        id: Date.now().toString(),
-        title: designName.trim() || 'Borrador sin título',
+        id: template?.id || draftId || Date.now().toString(),
+        title: designName.trim() || (template ? template.title : 'Borrador sin título'),
         lastEdited: 'justo ahora',
-        category: category.trim() || 'Borradores',
-        status: 'draft',
+        category: category.trim() || (template ? template.category : 'Borradores'),
+        status: template?.status || 'draft',
         icon: 'Mail',
         htmlBody,
         to,
@@ -183,10 +183,10 @@ export const EditorScreen: React.FC<EditorScreenProps> = ({ template, onSave, on
         <div className="space-y-2">
           <label className="text-sm font-semibold text-slate-700 dark:text-slate-300 ml-1">Para</label>
           <input
-            type="email"
+            type="text"
             value={to}
             onChange={(e) => setTo(e.target.value)}
-            placeholder="destinatario@ejemplo.com"
+            placeholder="destinatario1@ejemplo.com, destinatario2@ejemplo.com"
             className="w-full h-14 px-4 rounded-xl border border-primary/20 bg-white dark:bg-primary/5 focus:ring-2 focus:ring-primary/40 focus:border-primary transition-all outline-none"
           />
         </div>
